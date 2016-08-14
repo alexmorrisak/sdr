@@ -18,7 +18,7 @@ class filter : public radiocomponent {
       int32_t* outPtr;
       unsigned int oldReg = -1;
       while(1) {
-        rclisten(inReg);
+        rclisten();
         unsigned int addr = inReg[0];
         size_t buffSize = inReg[1];
         //printf("Got a message. size: %i, location: %u\n", localReg[1], localReg[0]);

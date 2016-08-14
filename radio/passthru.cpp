@@ -17,7 +17,7 @@ class passthru : public radiocomponent {
       unsigned int oldReg = -1;
       flock(fd2, LOCK_EX);
       while(1) {
-        rclisten(inReg);
+        rclisten();
         unsigned int addr = inReg[0];
         size_t buffSize = inReg[1];
         //printf("Got a message. size: %i, location: %u\n", localReg[1], localReg[0]);

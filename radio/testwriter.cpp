@@ -1,6 +1,6 @@
 #include "radiocomponent.hpp"
 
-#define LOOKUP_SIZE 1024
+#define LOOKUP_SIZE 4096
 //#define CHUNK_SIZE 1024
 //#define BUFFER_SIZE 128*CHUNK_SIZE // size of buffer in bytes
 
@@ -50,7 +50,7 @@ class testwriter : public radiocomponent {
             outReg[0] = (j*CHUNK_SIZE/(2*sizeof(int32_t))); //address of new data in shared memory
             outReg[1] = (CHUNK_SIZE); //size of new data in shared memory
             outReg[2] = j;
-            printf("%i\n", j);
+            //printf("ndigits %i @ %i\n", outReg[1], j);
             notify(outReg);
             //if (verbose) printf("Notifying client\n");
             if (0) {
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
   try{
     testwriter test("write.tmp");
     test.post(5000);
-    printf("done posting\n");
+    //printf("done posting\n");
     test.run(10000, atof(argv[1]), atof(argv[2]));
     return 0;
   }
