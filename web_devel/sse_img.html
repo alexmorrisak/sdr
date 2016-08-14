@@ -1,0 +1,157 @@
+<!DOCTYPE HTML>
+<html>
+   <head>
+      <meta charset="utf-8"/>
+   </head>
+   <body>
+     <h1>Test Spectrogram using Web Sockets </h1>
+     <button id="startButton">Start</button> 
+     <button id="stopButton">Stop</button> 
+     <div id="result"></div>
+     <canvas id="xyCanvas" width="512" height="100" style="border:1px solid #000000;">
+     </canvas>
+
+     <br>
+
+     <canvas id="imgCanvas" width="512" height="400" style="border:1px solid #000000;">
+     </canvas>
+     <script>
+     var bstart = document.getElementById("startButton");
+     var bstop = document.getElementById("stopButton");
+     var c = document.getElementById("imgCanvas");
+     var ctx = c.getContext("2d");
+     var c = document.getElementById("xyCanvas");
+     var xyctx = c.getContext("2d");
+     xyctx.globalCompositeOperation = "copy";
+     var imagex = 512;
+     var imagey = 400;
+     var imageData = ctx.createImageData(imagex,imagey);
+     var data = imageData.data;
+     var socket_di;
+
+
+     function Create2DArray(rows) {
+       var arr = [];
+     
+       for (var i=0;i<rows;i++) {
+          arr[i] = [];
+       }
+     
+       return arr;
+     }
+
+     function getFloatArray(blob, nelements, offset) {
+       var arr = [];
+     
+       for (var i=0;i<nelements;i++) {
+          arr[i] = dv.getFloat32(offset+i);
+       }
+     
+       return arr;
+     }
+
+     function get_appropriate_ws_url()
+     {
+       var pcol;
+       var u = document.URL;
+     
+       /*
+        * We open the websocket encrypted if this page came on an
+        * https:// url itself, otherwise unencrypted
+        */
+     
+       if (u.substring(0, 5) == "https") {
+         pcol = "wss://";
+         u = u.substr(8);
+       } else {
+         pcol = "ws://";
+         if (u.substring(0, 4) == "http")
+           u = u.substr(7);
+       }
+     
+       u = u.split('/');
+     
+       /* + "/xxx" bit is for IE10 workaround */
+     
+       return pcol + u[0] + "/xxx";
+     }
+
+     dataBuff = Create2DArray(16);
+     var ir = 0;
+
+     bstop.addEventListener("click", function() {
+         socket_di.close();
+     });
+     bstart.addEventListener("click", function() {
+         console.log("button clicked\n");
+
+     if (typeof MozWebSocket != "undefined") {
+       socket_di = new MozWebSocket(get_appropriate_ws_url(),
+              "dumb-increment-protocol");
+     } else {
+       socket_di = new WebSocket(get_appropriate_ws_url(),
+              "dumb-increment-protocol");
+     }
+     socket_di.binaryType = "arraybuffer";
+
+     try {
+       socket_di.onopen = function() {
+       }
+
+       socket_di.onmessage =function got_packet(msg) {
+         console.log("got msg of length: %i\n", msg.length);
+         ir = (ir + 1) % 16;
+         //var data = msg.data;
+         //var dv = new DataView(msg.data);
+         //console.log("dv length: %i\n",dv.length)
+         //dv.setFloat64(0, 10);
+         //console.log("made data\n");
+         //dataBuff[ir] = getFloatArray(dv, 0, 1);
+         //console.log(dataBuff[ir][0]);
+         dataBuff[ir] = msg.data.split(" ");
+         var imy = imagey -(dataBuff[ir][0] % imagey + 1);
+         //var randArr = new Date();
+         for (var y = imy; y<imy+1; y+=1) {
+           for (var x = 0; x<imagex; x+=1) {
+
+             //modify image data array
+             //var insy = 100*parseInt(dataBuff[ir][x],10)-100;
+             var insy = 10*dataBuff[ir][x]-500;
+             var i = 4*(imagex*y + x);
+             data[i]  = insy*.9;     // red
+             data[i+1] = insy*.2;
+             data[i+2] = insy*.1;
+             data[i+3] = 255; // transparency
+
+           }
+         }
+         ctx.putImageData(imageData, 0, -imy, 0, imy,     imagex, 400-imy);
+         ctx.putImageData(imageData, 0, 400-imy,  0, 0, imagex, imy);
+
+         // Draw new line
+         xyctx.beginPath();
+         xyctx.moveTo(0,0);
+         for (var x = 0; x<(imagex-1); x+=1) {
+             var insy = 10*parseInt(dataBuff[ir][x+1]-50,10);
+             //Draw x-y plot
+             xyctx.lineTo(x+1, 99-.1*insy);
+         }
+         xyctx.strokeStyle = '#000000';
+         xyctx.lineWidth = 1;
+         xyctx.stroke();
+
+         document.getElementById("result").innerHTML = dataBuff[ir][0];
+       }
+
+       socket_di.onclose = function(){
+       }
+     } catch(exception) {
+       alert('<p>Error' + exception);
+     }
+
+     });
+
+     </script>
+
+   </body>
+</html>
