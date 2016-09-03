@@ -33,6 +33,7 @@ class testreader : public radiocomponent {
     }
 
     void run () {
+      int totalPackets = 0;
       int fd;
       char * myfifo = "/tmp/myfifo";
       float buf[2*CHUNK_SIZE];
@@ -66,7 +67,9 @@ class testreader : public radiocomponent {
         rclisten();
 
         // Service all items in the queue
-        printf("Queue size: %i\n", dq.size());
+        //printf("Queue size: %i\n", dq.size());
+        totalPackets += dq.size();
+        printf("total packets: %i\n", totalPackets);
         while (dq.size()) {
           dqmtx.lock();
           ndigits = dq.front().size;
@@ -84,14 +87,14 @@ class testreader : public radiocomponent {
           // System calls are expensive.  Only do this
           // if we have time!
           /* write data to the FIFO */
-          if ((dq.size() % 50) == 0) {
+          //if ((dq.size() % 50) == 0) {
           //if (false) {
             buf[0]++;
             for (int i=1; i<2*ndigits; i++){
               buf[i] = 10*std::log10(float(out[i].re*out[i].re) + float(out[i].im*out[i].im));
             }
             write(fd, buf, 2*ndigits*sizeof(float));
-          }
+          //}
         } //Done with all elements in the data queue
       } //processing loop
       fftw_destroy_plan(p);  
@@ -109,10 +112,7 @@ int main(int argc, char *argv[]) {
   try{
     testreader test( "write.tmp");
     test.subscribe(atoi(argv[1]));
-    //test.unregister();
-    //test.post(5001);
     test.run();
-    //test.rclisten();
     
     return 0;
   }

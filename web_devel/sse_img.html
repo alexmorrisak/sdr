@@ -2,13 +2,23 @@
 <html>
    <head>
       <meta charset="utf-8"/>
+      <style>
+      body {
+        background-color: lightgrey;
+        margin: auto
+      }
+      h1 {
+        font-size: large;
+        color: black;
+        margin: auto
+      }
+
+      </style>
    </head>
    <body>
      <h1>Test Spectrogram using Web Sockets </h1>
-     <button id="startButton">Start</button> 
-     <button id="stopButton">Stop</button> 
      <div id="result"></div>
-     <canvas id="xyCanvas" width="512" height="100" style="border:1px solid #000000;">
+     <canvas id="xyCanvas" width="512" height="200" style="border:1px solid #000000;">
      </canvas>
 
      <br>
@@ -16,18 +26,23 @@
      <canvas id="imgCanvas" width="512" height="400" style="border:1px solid #000000;">
      </canvas>
      <script>
-     var bstart = document.getElementById("startButton");
-     var bstop = document.getElementById("stopButton");
+     //var bstart = document.getElementById("startButton");
+     //var bstop = document.getElementById("stopButton");
      var c = document.getElementById("imgCanvas");
      var ctx = c.getContext("2d");
      var c = document.getElementById("xyCanvas");
      var xyctx = c.getContext("2d");
+     xyctx.fillStyle = "#9ea7b8";
      xyctx.globalCompositeOperation = "copy";
      var imagex = 512;
      var imagey = 400;
      var imageData = ctx.createImageData(imagex,imagey);
      var data = imageData.data;
      var socket_di;
+     var imy = 400;
+
+     document.getElementById("xyCanvas").style.backgroundColor = "white";
+     document.getElementById("imgCanvas").style.backgroundColor = "lightblue";
 
 
      function Create2DArray(rows) {
@@ -78,12 +93,11 @@
 
      dataBuff = Create2DArray(16);
      var ir = 0;
+     var queue = 0;
+     var dataCum = [];
+     var oldDataCum = [];
+     var insy = [];
 
-     bstop.addEventListener("click", function() {
-         socket_di.close();
-     });
-     bstart.addEventListener("click", function() {
-         console.log("button clicked\n");
 
      if (typeof MozWebSocket != "undefined") {
        socket_di = new MozWebSocket(get_appropriate_ws_url(),
@@ -92,35 +106,50 @@
        socket_di = new WebSocket(get_appropriate_ws_url(),
               "dumb-increment-protocol");
      }
-     socket_di.binaryType = "arraybuffer";
 
      try {
        socket_di.onopen = function() {
+         console.log("opened socket\n");
        }
 
-       socket_di.onmessage =function got_packet(msg) {
-         console.log("got msg of length: %i\n", msg.length);
-         ir = (ir + 1) % 16;
-         //var data = msg.data;
-         //var dv = new DataView(msg.data);
-         //console.log("dv length: %i\n",dv.length)
-         //dv.setFloat64(0, 10);
-         //console.log("made data\n");
-         //dataBuff[ir] = getFloatArray(dv, 0, 1);
-         //console.log(dataBuff[ir][0]);
-         dataBuff[ir] = msg.data.split(" ");
-         var imy = imagey -(dataBuff[ir][0] % imagey + 1);
-         //var randArr = new Date();
+       var numBufs;
+       var tmpBuf = [];
+       socket_di.onmessage = function got_packet(msg) {
+         tmpBuf = msg.data.split(" ");
+         numBufs = 1*tmpBuf[0];
+         //console.log("got %i chucnks\n", numBufs);
+         for (var ib=0; ib<numBufs; ib++){
+           for (var ix = 1; ix < imagex; ix+=1) {
+             dataBuff[ib][ix] = 20*tmpBuf[ib*256+ix]-1900;
+
+             if (queue==0) {
+               dataCum[ix] = dataBuff[ir][ix];
+             }
+             else {
+               dataCum[ix] += dataBuff[ir][ix];
+             }
+           }
+           if (queue < 15) {queue += 1};
+         }
+       }
+       function plot_data() {
+         for (var x=0; x<imagex; x+=1) {
+           insy[x] = dataCum[x] / queue;
+           if (queue == 0) {
+             insy[x] = oldDataCum[x];
+           }
+           oldDataCum[x] = insy[x];
+           insy[x] = insy[x] - 400;
+         }
+         imy = ((imy - 1) % imagey + imagey) % imagey;
+         //console.log("imy: %i\n", imy);
          for (var y = imy; y<imy+1; y+=1) {
            for (var x = 0; x<imagex; x+=1) {
-
-             //modify image data array
-             //var insy = 100*parseInt(dataBuff[ir][x],10)-100;
-             var insy = 10*dataBuff[ir][x]-500;
+             /*modify image data array*/
              var i = 4*(imagex*y + x);
-             data[i]  = insy*.9;     // red
-             data[i+1] = insy*.2;
-             data[i+2] = insy*.1;
+             data[i]  = .3*(insy[x]+800);     // red
+             data[i+1] = .2*(insy[x]+800);
+             data[i+2] = 500-.4*(insy[x]+800);
              data[i+3] = 255; // transparency
 
            }
@@ -128,28 +157,38 @@
          ctx.putImageData(imageData, 0, -imy, 0, imy,     imagex, 400-imy);
          ctx.putImageData(imageData, 0, 400-imy,  0, 0, imagex, imy);
 
-         // Draw new line
+         /* Draw new line */
          xyctx.beginPath();
          xyctx.moveTo(0,0);
          for (var x = 0; x<(imagex-1); x+=1) {
-             var insy = 10*parseInt(dataBuff[ir][x+1]-50,10);
              //Draw x-y plot
-             xyctx.lineTo(x+1, 99-.1*insy);
+             xyctx.lineTo(x+1, 99-.1*insy[x]);
          }
          xyctx.strokeStyle = '#000000';
          xyctx.lineWidth = 1;
          xyctx.stroke();
 
-         document.getElementById("result").innerHTML = dataBuff[ir][0];
+         //document.getElementById("result").innerHTML = dataBuff[ir][0];
+         //document.getElementById("result").innerHTML = ir;
+         document.getElementById("result").innerHTML = queue;
+         //document.getElementById("result").innerHTML = numBufs;
+
+         console.log("numBufs: %i", numBufs);
+         //console.log("imy: %i", imy);
+         //window.requestAnimationFrame(plot_data);
+         queue = 0;
        }
 
        socket_di.onclose = function(){
        }
+       //window.requestAnimationFrame(plot_data);
+       setInterval(plot_data, 50);
      } catch(exception) {
        alert('<p>Error' + exception);
      }
 
-     });
+     //}
+     //);
 
      </script>
 
