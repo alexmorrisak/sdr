@@ -53,26 +53,23 @@ class testwriter : public radiocomponent {
         lookup_q[inx] = 0;
       }
       flock(fd2, LOCK_EX);
-      size_t audioinx;
+      size_t audioinx = 0;
       while (1) {
         while (actualSamps < targetSamps){
+          // Calculate the buffer indicies.  i is fine-grained, j is coarse-grained
           i = (i+1) % (BUFFER_SIZE / (2*sizeof(int32_t)));
-          //j = i/(2*sizeof(int32_t)) / CHUNK_SIZE;
           j = i / CHUNK_SIZE;
+
           audioinx++;
-          //outBuffer[2*i] = lookup_i[i % LOOKUP_SIZE];
-          //outBuffer[2*i+1] = lookup_q[i % LOOKUP_SIZE];
           outBuffer[2*i] = ptr[2*audioinx % lookup_size+0];
           outBuffer[2*i+1] = ptr[2*audioinx % lookup_size+1];
-          //if (i%100 == 0) printf("%i: %i\n", i, ptr[audioinx % 1000000]);
+
+          //Notify the client of new data chunk
           if (j != oldj) {
             outReg[0] = (j*CHUNK_SIZE/(2*sizeof(int32_t))); //address of new data in shared memory
             outReg[1] = (CHUNK_SIZE); //size of new data in shared memory
             outReg[2] = j;
-            //printf("ndigits %i @ %i\n", outReg[1], j);
-            notify(outReg);
-            //printf("Notify. %i %i\n", j, actualSamps);
-            //if (verbose) printf("Notifying client\n");
+            notify((char*) outReg, 3*sizeof(int32_t));
             if (0) {
               for (int inx=0; inx<CHUNK_SIZE; inx++){
                 printf("%.1f ", float(outBuffer[inx]));
@@ -80,8 +77,12 @@ class testwriter : public radiocomponent {
             }
             oldj = j;
           }
+
+          //Increment the number of samples we have processed
           actualSamps++;
         }
+
+        // If we're ahead of schedule then we sleep for a while
         while (actualSamps > targetSamps - 0.1*rate) {
           //if (verbose) printf("sleeping\n");
           usleep(1000);
@@ -92,7 +93,7 @@ class testwriter : public radiocomponent {
             old_sec = time.tv_sec;
           }
           targetSamps = elapsed_usec * 1e-6*rate;
-        }
+        } //End sleep
       }
     }
   private:

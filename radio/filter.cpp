@@ -35,7 +35,7 @@ class filter : public radiocomponent {
           outPtr[2*i+1] = cos(freq*i) * inPtr[2*i+1] + sin(freq*i) * inPtr[2*i];
         }
         memcpy(outReg, inReg, 8*sizeof(int32_t));
-        notify(outReg);
+        notify((char*) outReg, 3*sizeof(int32_t));
       }
       return;
     }

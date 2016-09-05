@@ -24,7 +24,7 @@ class passthru : public radiocomponent {
         printf("%i %i %i\n", inReg[0], inReg[1], inReg[2]);
         memcpy(outBuffer+inReg[0], inBuffer+inReg[0], buffSize);
         memcpy(outReg, inReg, 8*sizeof(int32_t));
-        notify(outReg);
+        notify((char*) outReg, 3*sizeof(int32_t));
       }
       return;
     }

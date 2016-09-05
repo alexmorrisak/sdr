@@ -18,6 +18,22 @@
    <body>
      <h1>Test Spectrogram using Web Sockets </h1>
      <div id="result"></div>
+     <div id="center_freq"></div>
+     <div id="span"></div>
+     <div id="num_channels"></div>
+
+	  <p>Choose Channel: </p>
+    <select name="Channels" onchange="form()">
+        <option value="Channels" selected disabled>Channels</option>
+        <option value="0">1</option>
+        <option value="1">2</option>
+        <option value="2">3</option>
+        <option value="3">4</option>
+        <option value="4">5</option>
+        <option value="5">6</option>
+    </select>
+	  <p> </p>
+
      <canvas id="xyCanvas" width="512" height="200" style="border:1px solid #000000;">
      </canvas>
 
@@ -97,6 +113,7 @@
      var dataCum = [];
      var oldDataCum = [];
      var insy = [];
+     var json;
 
 
      if (typeof MozWebSocket != "undefined") {
@@ -115,12 +132,15 @@
        var numBufs;
        var tmpBuf = [];
        socket_di.onmessage = function got_packet(msg) {
-         tmpBuf = msg.data.split(" ");
-         numBufs = 1*tmpBuf[0];
+         json = JSON.parse(msg.data);
+         var channel = document.getElementsByName("Channels")[0].value;
+
+         tmpBuf = json.data[channel];
+         numBufs = 1;
          //console.log("got %i chucnks\n", numBufs);
          for (var ib=0; ib<numBufs; ib++){
            for (var ix = 1; ix < imagex; ix+=1) {
-             dataBuff[ib][ix] = 20*tmpBuf[ib*256+ix]-1900;
+             dataBuff[ib][ix] = 20*tmpBuf[ib*256+ix]-1850;
 
              if (queue==0) {
                dataCum[ix] = dataBuff[ir][ix];
@@ -139,7 +159,7 @@
              insy[x] = oldDataCum[x];
            }
            oldDataCum[x] = insy[x];
-           insy[x] = insy[x] - 400;
+           insy[x] = insy[x] - 300;
          }
          imy = ((imy - 1) % imagey + imagey) % imagey;
          //console.log("imy: %i\n", imy);
@@ -148,8 +168,8 @@
              /*modify image data array*/
              var i = 4*(imagex*y + x);
              data[i]  = .3*(insy[x]+800);     // red
-             data[i+1] = .2*(insy[x]+800);
-             data[i+2] = 500-.4*(insy[x]+800);
+             data[i+1] = .5*(insy[x]+800);
+             data[i+2] = 300-.4*(insy[x]+800);
              data[i+3] = 255; // transparency
 
            }
@@ -168,10 +188,10 @@
          xyctx.lineWidth = 1;
          xyctx.stroke();
 
-         //document.getElementById("result").innerHTML = dataBuff[ir][0];
-         //document.getElementById("result").innerHTML = ir;
          document.getElementById("result").innerHTML = queue;
-         //document.getElementById("result").innerHTML = numBufs;
+         document.getElementById("center_freq").innerHTML = json.CenterFreq_kHz;
+         document.getElementById("span").innerHTML = json.Span_kHz;
+         document.getElementById("num_channels").innerHTML = json.NumChannels;
 
          console.log("numBufs: %i", numBufs);
          //console.log("imy: %i", imy);
@@ -182,7 +202,7 @@
        socket_di.onclose = function(){
        }
        //window.requestAnimationFrame(plot_data);
-       setInterval(plot_data, 50);
+       setInterval(plot_data, 40);
      } catch(exception) {
        alert('<p>Error' + exception);
      }

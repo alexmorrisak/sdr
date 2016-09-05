@@ -27,6 +27,7 @@
 
 #include "registry.hpp"
 #include "include/sockman.hpp"
+#include "../../cJSON/cJSON.h"
 
 #define CHUNK_SIZE 256
 #define BUFFER_SIZE 1024*CHUNK_SIZE // size of buffer in bytes
@@ -134,25 +135,32 @@ class radiocomponent {
       return 0;
     }
 
-    void notify(int32_t* outReg) {
-      sockManMsg msg, rmsg;
-      msg.type = NOTIFY;
-      msg.length = 3*sizeof(int32_t);
+    void notify(char* msg, size_t len) {
+      sockManMsg smsg;
+      smsg.type = NOTIFY;
+      smsg.length = 3*sizeof(int32_t);
       std::vector<int> dead_clients;
+
+      // Notify all clients that we are keeping track of
       for (int i=0; i<clients.size(); i++){
-        int rv = recv(clients[i], &rmsg, sizeof(sockManMsg), MSG_PEEK);
-        //printf("Notifying client\n");
-        //printf("clients[%i]: %i\n", i, clients[i]);
-        rv = write(clients[i], &msg, sizeof(sockManMsg));
+        int rv = write(clients[i], &smsg, sizeof(sockManMsg));
+        // If the write() failed, then good chance the client
+        // disconnected.  Remove this client from the client list.
+        // TODO: add more logic here.  Is it really dead or some other error?
         if (rv < 0) dead_clients.push_back(i);
-        rv = write(clients[i], outReg, 3*sizeof(int32_t));
+
+        // Write the contents of the outReg to client
+        rv = write(clients[i], msg, len);
       }
+
+      //Remove all clients that were discovered to be dead
       for (int i=0; i<dead_clients.size(); i++){
         printf("Deleting client %i\n", i);
         clients[dead_clients[i]] = clients.back();
         clients.pop_back();
       }
-    }
+
+    } //End function notify()
 
     void unregister(){
       printf("unregistering\n");
@@ -167,6 +175,7 @@ class radiocomponent {
     }
 
     int rclisten() {
+      cJSON *buff;
       if (!connected) {
         while (subscribe(subscriptionPort)) {
           printf("can't subscribe.  retrying..\n");
@@ -176,6 +185,7 @@ class radiocomponent {
 
       struct dataMsg dmLocal;
       int32_t buf[8];
+      //char buf[1024];
       sockManMsg msg;
 
       fd_set rfds;
@@ -208,6 +218,7 @@ class radiocomponent {
             // keeping up with incoming samples.  If that's
             // the case, then we won't add anything to the queue.
             if (dq.size() < HIGH_WATER) {
+
               dmLocal.location = buf[0];
               dmLocal.size = buf[1];
               dmLocal.id = buf[2];
