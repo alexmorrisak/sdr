@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
   }
   try{
     testwriter test("write.tmp");
-    //t1 = std::thread(test.connection_handler,5000));
+    //std::thread t1(test.connection_handler,5000);
     test.post(5000);
     //printf("done posting\n");
     fname = argv[1];
