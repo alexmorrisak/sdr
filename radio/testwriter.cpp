@@ -1,8 +1,7 @@
 #include "radiocomponent.hpp"
+#include <getopt.h>
 
 #define LOOKUP_SIZE 256*4096
-//#define CHUNK_SIZE 1024
-//#define BUFFER_SIZE 128*CHUNK_SIZE // size of buffer in bytes
 
 void help() {
   std::cout << "testwriter [args]\n";
@@ -40,16 +39,14 @@ class testwriter : public radiocomponent {
       size_t targetSamps = 0;
       size_t actualSamps = 0;
       size_t lookup_size;
+      notifyMsg nmsg;
       int32_t * lookup_i;
       int32_t * lookup_q;
-      lookup_i = (int32_t *) malloc(LOOKUP_SIZE*sizeof(int32_t));
-      lookup_q = (int32_t *) malloc(LOOKUP_SIZE*sizeof(int32_t));
       lookup_size = grab_audio(fd, &ptr);
-      for (int inx=0; inx<LOOKUP_SIZE; inx++){
-        //lookup_i[inx] = amp*(cos(freq*float(inx)) + 1e-4*(rand() % 1000 - 500));
-        //lookup_q[inx] = amp*(sin(freq*float(inx)) + 1e-4*(rand() % 1000 - 500));
-        lookup_i[inx] = (int32_t)1.*amp*ptr[2*inx];
-        //lookup_q[inx] = (int32_t)1.*amp*ptr[2*inx+1];
+      lookup_i = (int32_t *) malloc(lookup_size*sizeof(int32_t));
+      lookup_q = (int32_t *) malloc(lookup_size*sizeof(int32_t));
+      for (int inx=0; inx<lookup_size/2; inx++){
+        lookup_i[inx] = (int32_t)1.*amp*(ptr[2*inx] + ptr[2*inx+1]);
         lookup_q[inx] = 0;
       }
       flock(fd2, LOCK_EX);
@@ -61,15 +58,17 @@ class testwriter : public radiocomponent {
           j = i / CHUNK_SIZE;
 
           audioinx++;
-          outBuffer[2*i] = ptr[2*audioinx % lookup_size+0];
-          outBuffer[2*i+1] = ptr[2*audioinx % lookup_size+1];
+          outBuffer[2*i] = lookup_i[audioinx % (lookup_size/2)];
+          outBuffer[2*i+1] = lookup_q[audioinx % (lookup_size/2)];
 
           //Notify the client of new data chunk
           if (j != oldj) {
-            outReg[0] = (j*CHUNK_SIZE/(2*sizeof(int32_t))); //address of new data in shared memory
-            outReg[1] = (CHUNK_SIZE); //size of new data in shared memory
-            outReg[2] = j;
-            notify((char*) outReg, 3*sizeof(int32_t));
+            //nmsg.location = (void*) (j*CHUNK_SIZE*2*sizeof(int32_t)); //address of new data in shared memory
+            nmsg.location = (int) (j*CHUNK_SIZE); //address of new data in shared memory
+            printf("location: %i\n", nmsg.location);
+            nmsg.size = (size_t) (CHUNK_SIZE); //size of new data in shared memory
+            nmsg.id = j;
+            notify(&nmsg, sizeof(notifyMsg));
             if (0) {
               for (int inx=0; inx<CHUNK_SIZE; inx++){
                 printf("%.1f ", float(outBuffer[inx]));
@@ -99,6 +98,7 @@ class testwriter : public radiocomponent {
   private:
 };
 int main(int argc, char *argv[]) {
+  std::thread t1;
   if (argc < 3) {
     printf("Error!\nPlease supply command line argumentsn");
     help();
@@ -106,6 +106,7 @@ int main(int argc, char *argv[]) {
   }
   try{
     testwriter test("write.tmp");
+    //t1 = std::thread(test.connection_handler,5000));
     test.post(5000);
     //printf("done posting\n");
     fname = argv[1];
@@ -119,9 +120,6 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 };
-//#include <stdio.h>
-//#include <stdint.h>
-//#include <malloc.h>
 
 #define BUF_SIZE 4096
 int grab_audio(FILE * fd, int16_t** ptr) {

@@ -4,61 +4,114 @@
       <meta charset="utf-8"/>
       <style>
       body {
-        background-color: lightgrey;
+        background-color: grey;
         margin: auto
       }
       h1 {
+        text-align: center;
         font-size: large;
         color: black;
-        margin: auto
       }
+			
 
       </style>
    </head>
    <body>
      <h1>Test Spectrogram using Web Sockets </h1>
-     <div id="result"></div>
-     <div id="center_freq"></div>
-     <div id="span"></div>
-     <div id="num_channels"></div>
 
-	  <p>Choose Channel: </p>
+	  <p>
     <select name="Channels" onchange="form()">
-        <option value="Channels" selected disabled>Channels</option>
-        <option value="0">1</option>
-        <option value="1">2</option>
-        <option value="2">3</option>
-        <option value="3">4</option>
-        <option value="4">5</option>
-        <option value="5">6</option>
+        <option selected value="0">Channel 1</option>
+        <option value="1">Channel 2</option>
+        <option value="2">Channel 3</option>
+        <option value="3">Channel 4</option>
+        <option value="4">Channel 5</option>
+        <option value="5">Channel 6</option>
     </select>
+		<div>
+		<label for="Upper">Upper (dB): </label><input name="Upper" type="number" value="140" step="20"/>
+		</br>
+		<label for="Lower">Lower (dB): </label><input name="Lower" type="number" value="80" step="20"/>
+		</br>
+		<label for="upperFreq">Upper (kHz): </label><input name="upperFreq" type="number" value="22" step="1"/>
+		</br>
+		<label for="lowerFreq">Lower (kHz): </label><input name="lowerFreq" type="number" value="-22" step="1"/>
+		</div>
+    </p>
 	  <p> </p>
 
-     <canvas id="xyCanvas" width="512" height="200" style="border:1px solid #000000;">
+     <div id="plot_canvas" style="height: 210px; position: relative;">
+     <canvas id="xyBgCanvas" width="1024" height="200" style="border:1px solid #000000;
+       position: absolute; left: 0px; top: 0px; z-index: 0">
+     </canvas>
+     <canvas id="xyCanvas" width="1024" height="200" style="
+       position: absolute; left: 0px; top: 0px; z-index: 1">
+     </canvas>
+     </div>
+
+
+     <div id="img_canvas" width="1024" height="600" style="position: relative;">
+     <canvas id="imgCanvas" width="1024" height="600" style="border:1px solid #000000;
+       position: relative;">
      </canvas>
 
-     <br>
 
-     <canvas id="imgCanvas" width="512" height="400" style="border:1px solid #000000;">
+     <canvas id="colormap" width="255" height="20" style="border:3px solid #000000;">
      </canvas>
+     </div>
+
      <script>
-     //var bstart = document.getElementById("startButton");
-     //var bstop = document.getElementById("stopButton");
+     var imgX, imgY;
+     imgX = 1024; imgY=600;
      var c = document.getElementById("imgCanvas");
+     c.width = 0.9*imgX;
+     c.height = 400;
      var ctx = c.getContext("2d");
      var c = document.getElementById("xyCanvas");
+     //c.width = 0.9*imgX;
+     //c.height = 200;
      var xyctx = c.getContext("2d");
-     xyctx.fillStyle = "#9ea7b8";
+     //xyctx.fillStyle = "#9ea7b8";
      xyctx.globalCompositeOperation = "copy";
-     var imagex = 512;
-     var imagey = 400;
-     var imageData = ctx.createImageData(imagex,imagey);
+     //xyctx.globalCompositeOperation = "source-over";
+     var bgctx = document.getElementById("xyBgCanvas").getContext("2d");
+     var datax = 1024;
+     var datay = 600;
+     var imageData = ctx.createImageData(datax,datay);
      var data = imageData.data;
      var socket_di;
-     var imy = 400;
+     var imy = 600;
+     var newcanvas = document.createElement('canvas');
+     newcanvas.width=imgX;
+     newcanvas.height=imgY;
+     var newxycanvas = document.createElement('canvas');
+     //var xybgcanvas = document.createElement('canvas');
+     newxycanvas.width=imgX;
+     newxycanvas.height=200;
 
-     document.getElementById("xyCanvas").style.backgroundColor = "white";
-     document.getElementById("imgCanvas").style.backgroundColor = "lightblue";
+     //document.getElementById("xyCanvas").style.backgroundColor = "darkgrey";
+     document.getElementById("imgCanvas").style.backgroundColor = "black";
+
+
+     var cmap = document.getElementById("colormap");
+     cmapctx = cmap.getContext("2d");
+     for (var ic=0; ic<255; ic+=1){
+       var a = (1-ic/255.)/0.20;
+       if (a < 0) a=0;
+       var Xclr = Math.floor(a);
+       var Yclr = Math.floor(255*(a-Xclr));
+       var r,g,b;
+       switch(Xclr) {
+         case 0: r=255; g=Yclr; b=0; break;
+         case 1: r=255-Yclr; g=255; b=0; break;
+         case 2: r=0; g=255; b=Yclr; break;
+         case 3: r=0; g=255-Yclr; b=255; break;
+         case 4: r=0; g=0; b=255-Yclr; break;
+       }
+       cmapctx.fillStyle = 'rgb('+r+','+g+','+b+')';
+       //cmapctx.fillRect(255-ic-1,0,255-ic,20);
+       cmapctx.fillRect(ic,0,ic+1,20);
+     }
 
 
      function Create2DArray(rows) {
@@ -114,14 +167,17 @@
      var oldDataCum = [];
      var insy = [];
      var json;
+     var first = 0;
+     var nctx = newxycanvas.getContext("2d");
+     var span_khz = 100;
 
 
      if (typeof MozWebSocket != "undefined") {
        socket_di = new MozWebSocket(get_appropriate_ws_url(),
-              "dumb-increment-protocol");
+              "spectrogram-protocol");
      } else {
        socket_di = new WebSocket(get_appropriate_ws_url(),
-              "dumb-increment-protocol");
+              "spectrogram-protocol");
      }
 
      try {
@@ -131,78 +187,178 @@
 
        var numBufs;
        var tmpBuf = [];
+       var channel = 0;
+       var lower = document.getElementsByName("Lower")[0].value;
+       var upper = document.getElementsByName("Upper")[0].value;
        socket_di.onmessage = function got_packet(msg) {
          json = JSON.parse(msg.data);
-         var channel = document.getElementsByName("Channels")[0].value;
+         channel = document.getElementsByName("Channels")[0].value;
+         span_khz = json.Span_kHz;
 
          tmpBuf = json.data[channel];
          numBufs = 1;
-         //console.log("got %i chucnks\n", numBufs);
-         for (var ib=0; ib<numBufs; ib++){
-           for (var ix = 1; ix < imagex; ix+=1) {
-             dataBuff[ib][ix] = 20*tmpBuf[ib*256+ix]-1850;
+         for (var ix = 0; ix < 1024; ix+=1) {
+           dataBuff[0][ix] = tmpBuf[ix];
 
-             if (queue==0) {
-               dataCum[ix] = dataBuff[ir][ix];
-             }
-             else {
-               dataCum[ix] += dataBuff[ir][ix];
-             }
+           if (queue==0) {
+             dataCum[ix] = json.data[channel][ix];
            }
-           if (queue < 15) {queue += 1};
+           else {
+             dataCum[ix] += json.data[channel][ix];
+           }
          }
+         if (queue < 15) {queue += 1};
        }
-       function plot_data() {
-         for (var x=0; x<imagex; x+=1) {
-           insy[x] = dataCum[x] / queue;
+
+
+       function draw_bg() {
+
+         var lower = document.getElementsByName("Lower")[0].value;
+         var upper = document.getElementsByName("Upper")[0].value;
+         var lFreq = Number(document.getElementsByName("lowerFreq")[0].value);
+         var uFreq = Number(document.getElementsByName("upperFreq")[0].value);
+         var w = window.innerWidth;
+				 var newdiv = 20;
+         var div = Math.round((upper-lower) / 8)
+         if (div < 5) { newdiv = 5}
+         else if (div > 5 && div < 15) {newdiv = 10}
+         else if (div > 15) {newdiv = 20};
+				 div = newdiv;
+         var ndiv = Math.floor((upper-lower) / div);
+         
+         bgctx.canvas.width=w;
+         bgctx.fillStyle = "lightgrey";
+         //bgctx.clearRect(0,0,w,bgctx.canvas.height);
+         bgctx.fillRect(0,0,w,bgctx.canvas.height);
+         bgctx.fillStyle = "black";
+         bgctx.setLineDash([1,1]);
+         bgctx.strokeStyle = '#000000';
+         bgctx.strokeStyle = 'darkgrey'
+         //Draw horizontal grid lines (amp markers)
+         for (var x = 1; x<ndiv; x+=1) {
+           bgctx.moveTo(0,Math.floor(200/ndiv*x));
+           bgctx.lineTo(w, Math.floor(200/ndiv*x));
+           bgctx.stroke();
+         }
+         //Insert text (amp markers)
+         for (var x = 1; x<ndiv; x+=1) {
+           var divText = Math.round(Number(lower)+div*(ndiv-x));
+           bgctx.textAlign = "center";
+           bgctx.fillText(divText+"dB", 15, Math.floor(200/ndiv*x));
+         }
+
+         //Draw vertical grid lines (freq markers)
+         for (var x = 1; x<10; x+=1) {
+           bgctx.moveTo(Math.floor(w/10*x),0);
+           bgctx.lineTo(Math.floor(w/10*x), 200);
+           bgctx.stroke();
+         }
+         //Insert text (freq markers)
+         for (var x = 1; x<10; x+=1) {
+           //var divText = (span_khz/10*x-span_khz/2).toFixed(1);
+           var divText = ((uFreq-lFreq)/10*x+lFreq).toFixed(1);
+           bgctx.textAlign = "center";
+           bgctx.fillText(divText+"kHz", Math.floor(w/10*x), 200-5);
+         }
+         queue = 0;
+         console.log('draw_bg fired\n');
+       }
+       draw_bg();
+       window.addEventListener("resize", draw_bg);
+       document.getElementsByName("Upper")[0].addEventListener("click", draw_bg);
+       document.getElementsByName("Lower")[0].addEventListener("click", draw_bg);
+
+       var r=0, g=0, b=0;
+			 var xq=0;
+			 var dFreqBin = span_khz / 1024;
+			 var qFreqBin = 0;
+			 var qFreq=0;
+			 var tmpinsy=[];
+       function plot_image() {
+         var lower = document.getElementsByName("Lower")[0].value;
+         var upper = document.getElementsByName("Upper")[0].value;
+         var lFreq = Number(document.getElementsByName("lowerFreq")[0].value);
+         var uFreq = Number(document.getElementsByName("upperFreq")[0].value);
+         var w = window.innerWidth;
+
+         for (var x=0; x<1024; x+=1) {
+           tmpinsy[x] = dataCum[x] / queue;
            if (queue == 0) {
-             insy[x] = oldDataCum[x];
+             tmpinsy[x] = oldDataCum[x];
            }
-           oldDataCum[x] = insy[x];
-           insy[x] = insy[x] - 300;
+           oldDataCum[x] = tmpinsy[x];
+           insy[x] = tmpinsy[x];
          }
-         imy = ((imy - 1) % imagey + imagey) % imagey;
-         //console.log("imy: %i\n", imy);
-         for (var y = imy; y<imy+1; y+=1) {
-           for (var x = 0; x<imagex; x+=1) {
-             /*modify image data array*/
-             var i = 4*(imagex*y + x);
-             data[i]  = .3*(insy[x]+800);     // red
-             data[i+1] = .5*(insy[x]+800);
-             data[i+2] = 300-.4*(insy[x]+800);
-             data[i+3] = 255; // transparency
-
+			   dFreqBin = span_khz / 1024;
+			   qFreqBin = (uFreq-lFreq) / 1024;
+				 var xfraq =0;
+         for (var x=0; x<1024; x+=1) {
+				   //resample for the requested frequency range
+				   qFreq = x * qFreqBin  + lFreq;
+				   xq = Math.floor((qFreq + span_khz/2) / dFreqBin);
+					 xfrac = ((qFreq + span_khz/2) /dFreqBin) - 
+						 Math.floor((qFreq + span_khz/2) / dFreqBin);
+				   insy[x] = tmpinsy[xq] + xfrac*(tmpinsy[xq+1] - tmpinsy[xq]);
+				 }
+				 //console.log(xq);
+				 //insy = tmpinsy;
+         //insy[0] = 0.;
+         //insy[10] = 100;
+         //insy[1023-10] = 100;
+         imy = ((imy - 1) % datay + datay) % datay;
+         for (var x = 0; x<1024; x+=1) {
+           /*modify image data array*/
+           var i = 4*(1024*imy + x);
+           var a = (1-(insy[x]-lower)/(upper-lower))/.20;
+           //var a = 200-200*((1/(upper-lower))*insy[x]-lower);
+           if (a > 5 || a === undefined) {a=4.999;}
+           if (a < 0) {a=0.001;}
+           var Xclr = Math.floor(a);
+           var Yclr = Math.floor(255*(a-Xclr));
+           switch(Xclr) {
+             case 0: r=255; g=Yclr; b=0; break;
+             case 1: r=255-Yclr; g=255; b=0; break;
+             case 2: r=0; g=255; b=Yclr; break;
+             case 3: r=0; g=255-Yclr; b=255; break;
+             case 4: r=0; g=0; b=255-Yclr; break;
+             //case 5: r=Yclr; g=Yclr; b=Yclr; break;
            }
+           data[i]  = r;
+           data[i+1] = g;
+           data[i+2] = b;
+           data[i+3] = 255; // transparency
          }
-         ctx.putImageData(imageData, 0, -imy, 0, imy,     imagex, 400-imy);
-         ctx.putImageData(imageData, 0, 400-imy,  0, 0, imagex, imy);
+         newcanvas.getContext("2d").putImageData(
+             imageData, 0, -imy, 0, imy, datax, 600-imy);
+         newcanvas.getContext("2d").putImageData(
+             imageData, 0, 600-imy,  0, 0, datax, imy);
+         ctx.canvas.width=window.innerWidth;
+         ctx.drawImage(
+             newcanvas,0,0,1024,600,0,0,
+             window.innerWidth,imgY);
 
-         /* Draw new line */
+         xyctx.canvas.width=window.innerWidth;
          xyctx.beginPath();
          xyctx.moveTo(0,0);
-         for (var x = 0; x<(imagex-1); x+=1) {
+         var xcoord = 0;
+         for (var x = 0; x<1024; x+=1) {
              //Draw x-y plot
-             xyctx.lineTo(x+1, 99-.1*insy[x]);
+             var a = 200-200*(insy[x]-lower)/(upper-lower);
+             xcoord = Math.floor(w* (x+1) / 1024);
+             xyctx.lineTo(xcoord, a);
          }
          xyctx.strokeStyle = '#000000';
-         xyctx.lineWidth = 1;
+         xyctx.lineWidth = 1.0;
          xyctx.stroke();
 
-         document.getElementById("result").innerHTML = queue;
-         document.getElementById("center_freq").innerHTML = json.CenterFreq_kHz;
-         document.getElementById("span").innerHTML = json.Span_kHz;
-         document.getElementById("num_channels").innerHTML = json.NumChannels;
-
-         console.log("numBufs: %i", numBufs);
-         //console.log("imy: %i", imy);
-         //window.requestAnimationFrame(plot_data);
          queue = 0;
        }
 
        socket_di.onclose = function(){
        }
-       //window.requestAnimationFrame(plot_data);
-       setInterval(plot_data, 40);
+       //window.requestAnimationFrame(lot_data);
+       setInterval(plot_image, 50);
+       setInterval(draw_bg, 1000);
      } catch(exception) {
        alert('<p>Error' + exception);
      }

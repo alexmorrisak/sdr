@@ -1,20 +1,24 @@
 CFLAGS+=-std=c++11 -g3
 LIBS+=-lfftw -lpthread -l:libcjson.a
+INC+=-I./inc/
 LIBINC+=-L../../cJSON/
 all: testwriter testreader #filter passthru
 
-testwriter: testwriter.cpp radiocomponent.hpp
-	g++ testwriter.cpp $(CFLAGS) $(LIBS) $(LIBINC) -o testwriter
+testreader.o: testreader.cpp inc/radiocomponent.hpp
+	g++ -c testreader.cpp $(CFLAGS) $(INC) $(LIBS) $(LIBINC) -o testreader.o
 
-testreader: testreader.cpp radiocomponent.hpp
-	g++ testreader.cpp $(CFLAGS) $(LIBS) $(LIBINC) -o testreader
+testreader: testreader.o inc/radiocomponent.o
+	g++ testreader.o inc/radiocomponent.o $(INC) $(LIBINC) $(LIBS) -o testreader
 
-passthru: passthru.cpp radiocomponent.hpp
-	g++ passthru.cpp $(CFLAGS) $(LIBS) -o passthru
+testwriter.o: testwriter.cpp inc/radiocomponent.hpp
+	g++ -c testwriter.cpp $(CFLAGS) $(INC) $(LIBS) $(LIBINC) -o testwriter.o
 
-filter: filter.cpp radiocomponent.hpp
-	g++ filter.cpp $(CFLAGS) $(LIBS) -o filter
+testwriter: testwriter.o inc/radiocomponent.o
+	g++ testwriter.o inc/radiocomponent.o $(LIBS) $(LIBINC) -o testwriter
+
+inc/radiocomponent.o: inc/radiocomponent.cpp
+	g++ -c inc/radiocomponent.cpp $(CFLAGS) $(INC) $(LIBS) $(LIBINC) -o inc/radiocomponent.o
 
 clean:
-	rm testwriter testreader passthru filter
+	rm  testreader passthru filter
   
