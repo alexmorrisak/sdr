@@ -1,7 +1,7 @@
 CFLAGS+=-std=c++11 -g3
 LIBS+=-lfftw3 -lpthread -l:libcjson.a
 INC+=-I./inc/
-LIBINC+=-L../cJSON/
+LIBINC+=-L./cJSON/
 all: testwriter testreader spectrogram #pulsedetector filter passthru
 
 testreader.o: testreader.cpp inc/radiocomponent.hpp

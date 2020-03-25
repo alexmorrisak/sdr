@@ -40,7 +40,7 @@
 #include <sys/time.h>
 
 #include "sockman.hpp"
-#include "../../cJSON/cJSON.h"
+#include "../cJSON/cJSON.h"
 #include "./cxxopts.hpp"
 
 #define CHUNK_SIZE 1024
@@ -51,7 +51,7 @@ class radiocomponent {
   public:
 
     /**
-    * If no verbosity is specified, inherit from parent
+    * Class constructor.
     *
     * @param inBufferFile input buffer file name.  This file has a region of mapped memory associated with it
     * @param outBufferFile output buffer file name.  This file has a region of mapped memory associated with it
@@ -60,6 +60,12 @@ class radiocomponent {
 
     ~radiocomponent();
 
+    /**
+    * 
+    *
+    * @param inBufferFile input buffer file name.  This file has a region of mapped memory associated with it
+    * @param outBufferFile output buffer file name.  This file has a region of mapped memory associated with it
+    */
     int subscribe(int port);
 
     int post(int port);
