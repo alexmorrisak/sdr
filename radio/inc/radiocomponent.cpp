@@ -9,10 +9,6 @@ void radiocomponent::connection_handler(int port) {
   int listenfd = 0, connfd = 0;
   struct sockaddr_in serv_addr; 
   char sendBuff[1025];
-  //while(1) {
-  //  printf("here i am\n");
-  //  sleep(1);
-  //}
 
   listenfd = socket(AF_INET, SOCK_STREAM, 0);
   memset(&serv_addr, '0', sizeof(serv_addr));
@@ -35,23 +31,24 @@ void radiocomponent::connection_handler(int port) {
   while(1) {
     connfd = accept(listenfd, (struct sockaddr*)NULL, NULL); 
     printf("connection accepted\n");
-    sockManMsg msg;
-    int rv = read(connfd, &msg, sizeof(sockManMsg)); 
-    printf("bytes read: %i\n", rv);
-    switch(msg.type) {
-      case REGISTER:
-        clients.push_back(connfd);
-        msg.type = ACK;
-        msg.length = 0;
-        write(connfd, &msg, sizeof(msg));
-        printf("Registering client\n");
-        break;
-      default:
-        printf("Unknown message type\n");
-        break;
-      }
-      //usleep(10000);
-      printf("end of while loop\n");
+    clients.push_back(connfd);
+    //sockManMsg msg;
+    //int rv = read(connfd, &msg, sizeof(sockManMsg)); 
+    //printf("bytes read: %i\n", rv);
+    //switch(msg.type) {
+    //  case REGISTER:
+    //    clients.push_back(connfd);
+    //    msg.type = ACK;
+    //    msg.length = 0;
+    //    write(connfd, &msg, sizeof(msg));
+    //    printf("Registering client\n");
+    //    break;
+    //  default:
+    //    printf("Unknown message type\n");
+    //    break;
+    //  }
+    //  //usleep(10000);
+    //  printf("end of while loop\n");
     }
     printf("after while loop\n");
     return;
@@ -73,7 +70,7 @@ radiocomponent::radiocomponent ( std::string inBufferFile, std::string outBuffer
         if (ftruncate(fd1, BUFFER_SIZE*sizeof(char))) {
           throw "Error on file ftruncate()";
         }
-        inBuffer = (int32_t*) mmap((caddr_t)0, BUFFER_SIZE*sizeof(char), PROT_READ|PROT_WRITE,
+        inBuffer = (int32_t*) mmap((caddr_t)0, 4*BUFFER_SIZE*sizeof(char), PROT_READ|PROT_WRITE,
             MAP_SHARED, fd1, 0);
       }
 
@@ -85,13 +82,13 @@ radiocomponent::radiocomponent ( std::string inBufferFile, std::string outBuffer
         if (ftruncate(fd2, BUFFER_SIZE*sizeof(char))) {
           throw "Error on file ftruncate()";
         }
-        outBuffer = (int32_t*) mmap((caddr_t)0, BUFFER_SIZE*sizeof(char), PROT_READ|PROT_WRITE,
+        outBuffer = (int32_t*) mmap((caddr_t)0, 4*BUFFER_SIZE*sizeof(char), PROT_READ|PROT_WRITE,
             MAP_SHARED, fd2, 0);
       }
 
-      printf("inbuffer mapPtr: %x\n", (unsigned int) inBuffer);
+      printf("inbuffer mapPtr: %lu\n", (intptr_t) inBuffer);
       std::cout << "inbuffer filename: " << inBufferFile << std::endl;
-      printf("outbuffer mapPtr: %x\n", (unsigned int) outBuffer);
+      printf("outbuffer mapPtr: %lu\n", (intptr_t) outBuffer);
       std::cout << "outbuffer filename: " << outBufferFile << std::endl;
       // End open in/out buffers
 
@@ -133,15 +130,16 @@ int radiocomponent::subscribe(int port) {
 
   printf("Registering client\n");
   sockManMsg msg;
-  msg.type = REGISTER;
-  msg.length = sizeof(pid_t);
-  pid_t pid = getpid();
+  //msg.type = REGISTER;
+  //msg.length = sizeof(pid_t);
+  //pid_t pid = getpid();
   int rv;
-  rv = write(sockfd, &msg, sizeof(sockManMsg));
-  rv = write(sockfd, &pid, sizeof(pid));
-  printf("Reading from socket\n");
-  rv = read(sockfd, &msg, sizeof(sockManMsg));
-  printf("bytes returned: %i\n", rv);
+  //rv = write(sockfd, &msg, sizeof(sockManMsg));
+  //rv = write(sockfd, &pid, sizeof(pid));
+  //printf("Reading from socket\n");
+  //rv = read(sockfd, &msg, sizeof(sockManMsg));
+  //printf("bytes returned: %i\n", rv);
+  //if (msg.type == ACK) printf("Connection confirmed\n");
   connected = true;
   // make the socket non-blocking
   int status = fcntl(sockfd, F_SETFL, fcntl(sockfd, F_GETFL, 0) | O_NONBLOCK);
@@ -156,19 +154,18 @@ void radiocomponent::notify(notifyMsg* msg, size_t len) {
   std::vector<int> dead_clients;
 
   // Notify all clients that we are keeping track of
+  //printf("Sending to %u clients:\n", clients.size());
+  //printf("msg.size: %i\n", msg->size);
+  //printf("msg.location: %i\n", msg->location);
+  //printf("msg.id: %i\n", msg->id);
   for (int i=0; i<clients.size(); i++){
-    int rv = write(clients[i], &smsg, sizeof(smsg));
+    //int rv = write(clients[i], &smsg, sizeof(smsg));
+    int rv = write(clients[i], msg, sizeof(notifyMsg));
+    //int rv = 0;
     // If the write() failed, then good chance the client
     // disconnected.  Remove this client from the client list.
     // TODO: add more logic here.  Is it really dead or some other error?
     if (rv < 0) dead_clients.push_back(i);
-
-    // Write the contents of the outReg to client
-    printf("\nNotify:\n");
-    printf("size: %i\n", msg->size);
-    printf("location: %i\n", msg->location);
-    printf("id: %i\n", msg->id);
-    rv = write(clients[i], msg, sizeof(notifyMsg));
   }
 
   //Remove all clients that were discovered to be dead
@@ -201,7 +198,7 @@ int radiocomponent::rclisten() {
       sleep(1);
     }
   }
-  printf("connected, listening..\n");
+  //printf("connected, listening..\n");
 
   notifyMsg nm;
   sockManMsg msg;
@@ -214,34 +211,32 @@ int radiocomponent::rclisten() {
   tv.tv_usec = 0;
 
   int rv = select(sockfd+1, &rfds, NULL, NULL, NULL);
-  printf("got something!!\n");
+  //printf("got something (%i)!!\n", rv);
   int nloops = 0;
   while (rv > 0) {
     nloops++;
-    rv = read(sockfd, &msg, sizeof(sockManMsg));
-    if (rv <= 0) {
-      if (errno == EAGAIN){
-        continue;
-      }
-      else {
-        perror("read(): ");
-        connected = false;
-        return rv;
-      }
-    } 
-    printf("\nmsg type: %i\n", msg.type);
-    if (msg.type == NOTIFY) {
+    rv = read(sockfd, &nm, sizeof(notifyMsg));
+    //printf("read rv: %i\n", rv);
+    if (rv == 0) {
+      printf("Disconnected..\n");
+      connected = false;
+      break;
+    }
+    else if (rv < 0) {
+      return rv;
+    }
+    if (rv == sizeof(notifyMsg)) {
       //FD_ZERO(&rfds);
       //FD_SET(sockfd, &rfds);
       //struct timeval tv;
       //tv.tv_sec = 0;
       //tv.tv_usec = 0;
       //int rv = select(sockfd+1, &rfds, NULL, NULL, NULL); //blocking read
-      rv = read(sockfd, &nm, sizeof(notifyMsg));
-      printf("rv: %i\n", rv);
-      printf("nm.size: %i\n", nm.size);
-      printf("nm.location: %i\n", nm.location);
-      printf("nm.id: %i\n", nm.id);
+      //rv = read(sockfd, &nm, sizeof(notifyMsg));
+      //printf("rv: %i\n", rv);
+      //printf("nm.size: %i\n", nm.size);
+      //printf("nm.location: %i\n", nm.location);
+      //printf("nm.id: %i\n", nm.id);
         // Check if the queue length is less than the
         // high-water mark.  If it isn't, then in means we're not
         // keeping up with incoming samples.  If that's

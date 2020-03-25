@@ -19,8 +19,8 @@ struct sockManMsg {
 
 struct notifyMsg {
   size_t size;
-  int location;
-  int id;
+  size_t location;
+  size_t id;
 };
 
 #endif

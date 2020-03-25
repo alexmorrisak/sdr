@@ -1,3 +1,13 @@
+/**
+ * @file radiocomponent.hpp
+ *
+ * @brief Header file for the radiocomponent class
+ *
+ * @author Alex Morris
+ * Contact: alexmorrisak@gmail.com
+ *
+ */
+
 #ifndef RADIOCOMPONENT_H
 #define RADIOCOMPONENT_H
 
@@ -9,6 +19,7 @@
 #include <stdlib.h>
 #include <sys/file.h>
 #include <string.h>
+#include <cstdint>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -29,31 +40,38 @@
 #include <sys/time.h>
 
 #include "sockman.hpp"
-#include "../../../cJSON/cJSON.h"
+#include "../../cJSON/cJSON.h"
+#include "./cxxopts.hpp"
 
 #define CHUNK_SIZE 1024
 #define BUFFER_SIZE 1024*CHUNK_SIZE // size of buffer in bytes
 #define HIGH_WATER 1024
 
-//extern std::vector<int> clients;
-//extern std::queue<notifyMsg> dq;
-//extern void connection_handler(int port);
-//extern std::mutex dqmtx;
-
 class radiocomponent {
   public:
-    radiocomponent ( std::string inBufferFile, std::string outBufferFile );
-    ~radiocomponent ();
+
+    /**
+    * If no verbosity is specified, inherit from parent
+    *
+    * @param inBufferFile input buffer file name.  This file has a region of mapped memory associated with it
+    * @param outBufferFile output buffer file name.  This file has a region of mapped memory associated with it
+    */
+    radiocomponent(std::string inBufferFile, std::string outBufferFile);
+
+    ~radiocomponent();
+
     int subscribe(int port);
+
     int post(int port);
   protected:
-    
     void notify(notifyMsg* msg, size_t len);
-    
+
     void unregister();
 
     // This is a blocking read on messages from the up-stream process
     int rclisten();
+
+    void connection_handler(int port);
 
     int sockfd;
     int fd1, fd2;
@@ -65,7 +83,6 @@ class radiocomponent {
 
     std::vector<int> clients;
     std::queue<notifyMsg> dq;
-    void connection_handler(int port);
     std::mutex dqmtx;
   private:
 };
